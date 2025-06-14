@@ -183,6 +183,246 @@ public class MazeSolver {
         System.out.println("No path found.");
         return false;
     }
+    
+    // A* search algorithm 
+    public boolean AStar() {
+        // Before we start, we reset the maze to clear visited flags, parent references, and counters
+        resetMaze();
+
+        // Creates a priority queue that sorts tiles by their total estimated cost (fScore),
+        // ensuring that the most promising (cheapest) path is explored first
+        PriorityQueue<AStarNode> openSet = new PriorityQueue<>((a, b) -> Double.compare(a.fScore, b.fScore));
+
+        // The closedSet keeps track of tiles that have already been fully processed
+        Set<Tile> closedSet = new HashSet<>();
+
+        // gScore stores the cheapest known cost from the start tile to each tile
+        Map<Tile, Double> gScore = new HashMap<>();
+
+        // fScore stores the estimated total cost from start to goal through each tile
+        // (fScore = gScore + heuristic estimate to the goal)
+        Map<Tile, Double> fScore = new HashMap<>();
+
+        // Initialize the starting tile with gScore = 0 and fScore = heuristic to goal
+        AStarNode startNode = new AStarNode(start, 0, heuristic(start, end));
+
+        // Add the start tile to the priority queue and initialize its scores
+        openSet.offer(startNode);
+        gScore.put(start, 0.0);
+        fScore.put(start, heuristic(start, end));
+        start.setVisited(true);
+
+        // Main loop: continue exploring while there are still nodes in the open set
+        while (!openSet.isEmpty()) {
+
+            // Remove the tile with the lowest estimated cost from the queue
+            AStarNode currentNode = openSet.poll();
+            Tile current = currentNode.tile;
+
+            // Skip this tile if we've already processed it
+            if (closedSet.contains(current)) continue;
+
+            // Mark the current tile as processed
+            closedSet.add(current);
+
+            // Update step counter and UI (if available)
+            counter.value++;
+            if (ui != null) {
+                ui.updateCounter(counter.value);
+                ui.updateUI();
+            }
+
+            // Check if we have reached the goal tile
+            if (current.isEnd()) {
+                System.out.println("Reached the end! Final counter: " + counter.value);
+                if (ui != null) {
+                    ui.updateCounter(counter.value);
+                    ui.updateUI();
+                }
+                return true;
+            }
+
+            // Apply special effects like teleportation if the tile supports it
+            Tile next = current.applySpecialEffect(counter, maze);
+
+            // Handle teleportation: if we teleported to a new tile, process it
+            if (next != current) {
+                if (!closedSet.contains(next)) {
+
+                    // Calculate the new cost to reach the teleported tile
+                    double tentativeGScore = gScore.get(current) + 1;
+
+                    // If this path is better than any previous path to the tile (or first time visiting it)
+                    if (!gScore.containsKey(next) || tentativeGScore < gScore.get(next)) {
+                        // Update the tile's parent to allow path reconstruction later
+                        next.setParent(current);
+
+                        // Store the new gScore and calculate fScore
+                        gScore.put(next, tentativeGScore);
+                        double fScoreValue = tentativeGScore + heuristic(next, end);
+                        fScore.put(next, fScoreValue);
+
+                        // Mark the tile as visited and add it to the open set
+                        next.setVisited(true);
+                        openSet.offer(new AStarNode(next, tentativeGScore, fScoreValue));
+                    }
+                }
+                // After teleportation, we skip neighbor exploration of the original tile
+                continue;
+            }
+
+            // Explore all valid neighbors of the current tile
+            for (Tile neighbor : current.getValidNeighbors(maze)) {
+                // Skip if the neighbor has already been processed
+                if (closedSet.contains(neighbor)) continue;
+
+                // Calculate the tentative gScore from start to this neighbor via the current tile
+                double tentativeGScore = gScore.get(current) + 1;
+
+                // If this path to the neighbor is better than any previous path
+                if (!gScore.containsKey(neighbor) || tentativeGScore < gScore.get(neighbor)) {
+                    // Update the parent to enable path reconstruction
+                    neighbor.setParent(current);
+
+                    // Store the gScore and fScore for the neighbor
+                    gScore.put(neighbor, tentativeGScore);
+                    double fScoreValue = tentativeGScore + heuristic(neighbor, end);
+                    fScore.put(neighbor, fScoreValue);
+
+                    // Mark the neighbor as visited and add it to the priority queue
+                    neighbor.setVisited(true);
+                    openSet.offer(new AStarNode(neighbor, tentativeGScore, fScoreValue));
+                }
+            }
+        }
+
+        // If we exit the loop, it means no path to the goal was found
+        System.out.println("No path found.");
+        return false;
+    }
+
+    
+    // Helper class to store data used in A* comparison and sorting
+    private static class AStarNode {
+        Tile tile;        // The tile represented by this node
+        double gScore;    // Cost from the start to this tile
+        double fScore;    // Estimated total cost from start to goal through this tile
+
+        AStarNode(Tile tile, double gScore, double fScore) {
+            this.tile = tile;
+            this.gScore = gScore;
+            this.fScore = fScore;
+        }
+    }
+
+    
+    // Heuristic function for A* (Manhattan distance)
+    private double heuristic(Tile a, Tile b) {
+        return Math.abs(a.getRow() - b.getRow()) + Math.abs(a.getCol() - b.getCol());
+    }
+    
+    
+    // Greedy Best-First Search algorithm
+ // Greedy Best-First Search algorithm
+    public boolean greedyBestFirst() {
+        // Reset the maze before starting the search (clears visited flags, parents, and counter)
+        resetMaze();
+
+        // Priority queue that always picks the tile with the lowest heuristic (hScore)
+        // Greedy Best-First Search only considers how close the tile is to the goal (not total path cost)
+        PriorityQueue<GreedyNode> openSet = new PriorityQueue<>((a, b) -> Double.compare(a.hScore, b.hScore));
+
+        // Closed set to keep track of visited/processed tiles
+        Set<Tile> closedSet = new HashSet<>();
+
+        // Create the start node with its heuristic value (distance to goal)
+        GreedyNode startNode = new GreedyNode(start, heuristic(start, end));
+
+        // Add the start node to the open set and mark it as visited
+        openSet.offer(startNode);
+        start.setVisited(true);
+
+        // Continue searching while there are nodes in the open set
+        while (!openSet.isEmpty()) {
+
+            // Remove the tile with the lowest heuristic value (closest to goal)
+            GreedyNode currentNode = openSet.poll();
+            Tile current = currentNode.tile;
+
+            // Skip this tile if already processed
+            if (closedSet.contains(current)) continue;
+
+            // Mark the tile as processed
+            closedSet.add(current);
+
+            // Update step counter and UI (if exists)
+            counter.value++;
+            if (ui != null) {
+                ui.updateCounter(counter.value);
+                ui.updateUI();
+            }
+
+            // Check if we have reached the goal tile
+            if (current.isEnd()) {
+                System.out.println("Reached the end! Final counter: " + counter.value);
+                if (ui != null) {
+                    ui.updateCounter(counter.value);
+                    ui.updateUI();
+                }
+                return true;
+            }
+
+            // Apply special tile effects (e.g., teleportation)
+            Tile next = current.applySpecialEffect(counter, maze);
+
+            // If teleportation happens (next != current), process the teleported tile
+            if (next != current) {
+                if (!closedSet.contains(next)) {
+                    // Link the teleported tile to the current tile for path reconstruction
+                    next.setParent(current);
+                    next.setVisited(true);
+
+                    // Add the teleported tile to the open set based on its heuristic
+                    openSet.offer(new GreedyNode(next, heuristic(next, end)));
+                }
+                // Skip normal neighbor exploration when teleporting
+                continue;
+            }
+
+            // Explore all valid neighbors of the current tile
+            for (Tile neighbor : current.getValidNeighbors(maze)) {
+                // Skip already processed tiles
+                if (closedSet.contains(neighbor)) continue;
+
+                // If the neighbor hasn’t been visited yet
+                if (!neighbor.isVisited()) {
+                    // Set parent for path reconstruction
+                    neighbor.setParent(current);
+                    neighbor.setVisited(true);
+
+                    // Add to open set with heuristic value (h(n))
+                    openSet.offer(new GreedyNode(neighbor, heuristic(neighbor, end)));
+                }
+            }
+        }
+
+        // If the open set is empty and goal wasn’t reached, no path was found
+        System.out.println("No path found.");
+        return false;
+    }
+
+
+ // Helper class to store tile and its heuristic score
+    private static class GreedyNode {
+        Tile tile;      // The current tile
+        double hScore;  // Heuristic value: estimated distance to the goal (h(n))
+
+        GreedyNode(Tile tile, double hScore) {
+            this.tile = tile;
+            this.hScore = hScore;
+        }
+    }
+
 
     
     // Helper method to reset maze state
