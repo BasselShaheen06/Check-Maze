@@ -423,6 +423,223 @@ public class MazeSolver {
         }
     }
 
+    
+    // Dijkstra's algorithm
+    public boolean Dijkstra() {
+        // Reset the maze to clear all visited flags, parent links, and UI counter
+        resetMaze();
+
+        // Priority queue that always selects the tile with the smallest distance from the start
+        PriorityQueue<DijkstraNode> pq = new PriorityQueue<>((a, b) -> Double.compare(a.distance, b.distance));
+
+        // HashMap to store the shortest known distance from the start tile to each tile
+        Map<Tile, Double> distances = new HashMap<>();
+
+        // Set to keep track of tiles that have already been fully processed
+        Set<Tile> visited = new HashSet<>();
+
+        // Start node has a distance of 0 (since we're starting there)
+        pq.offer(new DijkstraNode(start, 0));
+        distances.put(start, 0.0);
+        start.setVisited(true); // Mark the start as visited
+
+        // Main loop continues as long as there are nodes to process
+        while (!pq.isEmpty()) {
+            // Retrieve the tile with the smallest distance value
+            DijkstraNode currentNode = pq.poll();
+            Tile current = currentNode.tile;
+
+            // Skip this tile if it has already been processed
+            if (visited.contains(current)) continue;
+
+            // Mark the tile as processed
+            visited.add(current);
+
+            // Update step counter and refresh UI
+            counter.value++;
+            if (ui != null) {
+                ui.updateCounter(counter.value);
+                ui.updateUI();
+            }
+
+            // Check if the goal has been reached
+            if (current.isEnd()) {
+                System.out.println("Reached the end! Final counter: " + counter.value);
+                if (ui != null) {
+                    ui.updateCounter(counter.value);
+                    ui.updateUI();
+                }
+                return true;
+            }
+
+            // Apply special effect (e.g., teleportation)
+            Tile next = current.applySpecialEffect(counter, maze);
+
+            // Handle teleportation
+            if (next != current) {
+                // Compute the new tentative distance through this path
+                double newDistance = distances.get(current) + 1;
+
+                // If this is the shortest path to this teleport destination
+                if (!distances.containsKey(next) || newDistance < distances.get(next)) {
+                    distances.put(next, newDistance);
+                    next.setParent(current); // Set parent for path reconstruction
+                    next.setVisited(true);
+                    pq.offer(new DijkstraNode(next, newDistance));
+                }
+                continue; // Skip normal neighbor exploration in this case
+            }
+
+            // Explore all valid adjacent tiles
+            for (Tile neighbor : current.getValidNeighbors(maze)) {
+                // Skip neighbors already visited
+                if (visited.contains(neighbor)) continue;
+
+                // Calculate the distance to this neighbor through the current tile
+                double newDistance = distances.get(current) + 1;
+
+                // Update distance and parent if it's the shortest path found so far
+                if (!distances.containsKey(neighbor) || newDistance < distances.get(neighbor)) {
+                    distances.put(neighbor, newDistance);
+                    neighbor.setParent(current);
+                    neighbor.setVisited(true);
+                    pq.offer(new DijkstraNode(neighbor, newDistance));
+                }
+            }
+        }
+
+        // If the queue is empty and the goal wasn't reached, there is no path
+        System.out.println("No path found.");
+        return false;
+    }
+    
+ // Helper class to hold a tile and its distance from the start
+    private static class DijkstraNode {
+        Tile tile;        // The current tile
+        double distance;  // The distance from the start tile to this tile
+
+        DijkstraNode(Tile tile, double distance) {
+            this.tile = tile;
+            this.distance = distance;
+        }
+    }
+
+    
+    
+ // Dead End Fill algorithm
+    public boolean deadEndFill() {
+        // Reset the maze before starting the algorithm
+        resetMaze();
+
+        // A 2D array to mark dead-end tiles
+        boolean[][] isDeadEnd = new boolean[maze.length][maze[0].length];
+        
+        // A flag to indicate if we found any new dead ends in a pass
+        boolean foundDeadEnd = true;
+
+        // Phase 1: Dead-end filling — iteratively mark all dead-end paths
+        while (foundDeadEnd) {
+            foundDeadEnd = false;
+
+            // Scan the entire maze
+            for (int i = 0; i < maze.length; i++) {
+                for (int j = 0; j < maze[i].length; j++) {
+                    Tile tile = maze[i][j];
+
+                    // Skip walls, start, end, or tiles already marked as dead ends
+                    if (tile.isWall() || tile.isStart() || tile.isEnd() || isDeadEnd[i][j]) {
+                        continue;
+                    }
+
+                    // Count number of walkable and non-dead-end neighbors
+                    int walkableNeighbors = 0;
+                    int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}; // up, down, left, right
+
+                    for (int[] dir : directions) {
+                        int newRow = i + dir[0];
+                        int newCol = j + dir[1];
+
+                        // Check bounds and valid walkable neighbor
+                        if (newRow >= 0 && newRow < maze.length &&
+                            newCol >= 0 && newCol < maze[0].length) {
+
+                            Tile neighbor = maze[newRow][newCol];
+                            if (!neighbor.isWall() && !isDeadEnd[newRow][newCol]) {
+                                walkableNeighbors++;
+                            }
+                        }
+                    }
+
+                    // If the tile has 1 or fewer valid paths, it's a dead end
+                    if (walkableNeighbors <= 1) {
+                        isDeadEnd[i][j] = true; // Mark as dead end
+                        foundDeadEnd = true;    // Trigger another pass
+                        counter.value++;        // Track how many dead ends we processed
+
+                        // Update the UI to mark the tile visually
+                        if (ui != null) {
+                            ui.markDeadEndTile(i, j);
+                            ui.updateCounter(counter.value);
+                            ui.updateUI();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Phase 2: Use BFS to search for a path while avoiding dead-end tiles
+        Queue<Tile> queue = new LinkedList<>();
+        queue.offer(start);           // Begin from the start tile
+        start.setVisited(true);
+
+        // BFS loop
+        while (!queue.isEmpty()) {
+            Tile current = queue.poll();
+
+            // Check if we reached the goal
+            if (current.isEnd()) {
+                System.out.println("Reached the end! Final counter: " + counter.value);
+                if (ui != null) {
+                    ui.updateCounter(counter.value);
+                    ui.updateUI();
+                }
+                return true;
+            }
+
+            // Update step counter and refresh UI
+            counter.value++;
+            if (ui != null) {
+                ui.updateCounter(counter.value);
+                ui.updateUI();
+            }
+
+            // Apply special tile behavior (e.g., teleport)
+            Tile next = current.applySpecialEffect(counter, maze);
+
+            // If teleportation happened, check if destination is valid
+            if (next != current) {
+                if (!next.isVisited() && !isDeadEnd[next.getRow()][next.getCol()]) {
+                    next.setVisited(true);
+                    next.setParent(current);
+                    queue.offer(next);
+                }
+                continue; // Don't explore neighbors if we teleported
+            }
+
+            // Explore each neighbor that is not a dead end
+            for (Tile neighbor : current.getValidNeighbors(maze)) {
+                if (!isDeadEnd[neighbor.getRow()][neighbor.getCol()]) {
+                    neighbor.setVisited(true);
+                    neighbor.setParent(current);
+                    queue.offer(neighbor);
+                }
+            }
+        }
+
+        // No valid path was found
+        System.out.println("No path found.");
+        return false;
+    }
 
     
     // Helper method to reset maze state
