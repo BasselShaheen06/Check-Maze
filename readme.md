@@ -217,7 +217,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [Inspired the CS50's introduction to AI](https://youtube.com/playlist?list=PLhQjrBD2T382Nz7z1AEXmioc27axa19Kv&si=agXRByYPWsO2i3hI)
+- [Inspired by CS50's introduction to AI](https://youtube.com/playlist?list=PLhQjrBD2T382Nz7z1AEXmioc27axa19Kv&si=agXRByYPWsO2i3hI)
 
 ---
 
